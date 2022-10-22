@@ -24,7 +24,7 @@ pub struct SimdComplex<T: FV> {
     pub im: T,
 }
 
-pub trait C64SimdSelect<T: FV> {
+pub trait SimdComplexSelect<T: FV> {
     fn cselect(
         self,
         trues: SimdComplex<T>,
@@ -32,13 +32,31 @@ pub trait C64SimdSelect<T: FV> {
     ) -> SimdComplex<T>;
 }
 
-// #[inline(always)]
-// pub fn splat((re, im): (f64, f64)) -> Self {
-//     Self {
-//         re: Simd::splat(re),
-//         im: Simd::splat(im),
-//     }
-// }
+impl<const LANES: usize> SimdComplex<Simd<f32, LANES>>
+where
+    LaneCount<LANES>: SupportedLaneCount,
+{
+    #[inline(always)]
+    pub fn splat((re, im): (f32, f32)) -> Self {
+        Self {
+            re: Simd::splat(re),
+            im: Simd::splat(im),
+        }
+    }
+}
+
+impl<const LANES: usize> SimdComplex<Simd<f64, LANES>>
+where
+    LaneCount<LANES>: SupportedLaneCount,
+{
+    #[inline(always)]
+    pub fn splat((re, im): (f64, f64)) -> Self {
+        Self {
+            re: Simd::splat(re),
+            im: Simd::splat(im),
+        }
+    }
+}
 
 impl<T: FV> SimdComplex<T> {
     #[inline(always)]
@@ -141,8 +159,7 @@ impl<T: FV> SubAssign for SimdComplex<T> {
     }
 }
 
-impl<T: FV> SubAssign<T> for SimdComplex<T>
-{
+impl<T: FV> SubAssign<T> for SimdComplex<T> {
     #[inline(always)]
     fn sub_assign(&mut self, rhs: T) {
         *self = *self - rhs;
@@ -215,24 +232,21 @@ impl<T: FV> Div<T> for SimdComplex<T> {
     }
 }
 
-impl<T: FV> DivAssign for SimdComplex<T>
-{
+impl<T: FV> DivAssign for SimdComplex<T> {
     #[inline(always)]
     fn div_assign(&mut self, rhs: Self) {
         *self = *self / rhs;
     }
 }
 
-impl<T: FV> DivAssign<T>
-    for SimdComplex<T>
-{
+impl<T: FV> DivAssign<T> for SimdComplex<T> {
     #[inline(always)]
     fn div_assign(&mut self, rhs: T) {
         *self = *self / rhs;
     }
 }
 
-impl<const LANES: usize> C64SimdSelect<Simd<f64, LANES>> for Mask<i64, LANES>
+impl<const LANES: usize> SimdComplexSelect<Simd<f64, LANES>> for Mask<i64, LANES>
 where
     LaneCount<LANES>: SupportedLaneCount,
 {
@@ -296,6 +310,79 @@ where
 
     #[inline(always)]
     fn div(self, rhs: SimdComplex<Simd<f64, LANES>>) -> Self::Output {
+        let denom = rhs.abssqr().recip();
+
+        SimdComplex {
+            re: self * rhs.re * denom,
+            im: -self * rhs.im * denom,
+        }
+    }
+}
+
+impl<const LANES: usize> SimdComplexSelect<Simd<f32, LANES>> for Mask<i32, LANES>
+where
+    LaneCount<LANES>: SupportedLaneCount,
+{
+    #[inline(always)]
+    fn cselect(
+        self,
+        trues: SimdComplex<Simd<f32, LANES>>,
+        falses: SimdComplex<Simd<f32, LANES>>,
+    ) -> SimdComplex<Simd<f32, LANES>> {
+        SimdComplex {
+            re: self.select(trues.re, falses.re),
+            im: self.select(trues.im, falses.im),
+        }
+    }
+}
+
+impl<const LANES: usize> Add<SimdComplex<Simd<f32, LANES>>> for Simd<f32, LANES>
+where
+    LaneCount<LANES>: SupportedLaneCount,
+{
+    type Output = SimdComplex<Simd<f32, LANES>>;
+
+    #[inline(always)]
+    fn add(self, rhs: SimdComplex<Simd<f32, LANES>>) -> Self::Output {
+        rhs + self
+    }
+}
+
+impl<const LANES: usize> Sub<SimdComplex<Simd<f32, LANES>>> for Simd<f32, LANES>
+where
+    LaneCount<LANES>: SupportedLaneCount,
+{
+    type Output = SimdComplex<Simd<f32, LANES>>;
+
+    #[inline(always)]
+    fn sub(self, rhs: SimdComplex<Simd<f32, LANES>>) -> Self::Output {
+        SimdComplex {
+            re: self - rhs.re,
+            im: -rhs.im,
+        }
+    }
+}
+
+impl<const LANES: usize> Mul<SimdComplex<Simd<f32, LANES>>> for Simd<f32, LANES>
+where
+    LaneCount<LANES>: SupportedLaneCount,
+{
+    type Output = SimdComplex<Simd<f32, LANES>>;
+
+    #[inline(always)]
+    fn mul(self, rhs: SimdComplex<Simd<f32, LANES>>) -> Self::Output {
+        rhs * self
+    }
+}
+
+impl<const LANES: usize> Div<SimdComplex<Simd<f32, LANES>>> for Simd<f32, LANES>
+where
+    LaneCount<LANES>: SupportedLaneCount,
+{
+    type Output = SimdComplex<Simd<f32, LANES>>;
+
+    #[inline(always)]
+    fn div(self, rhs: SimdComplex<Simd<f32, LANES>>) -> Self::Output {
         let denom = rhs.abssqr().recip();
 
         SimdComplex {
